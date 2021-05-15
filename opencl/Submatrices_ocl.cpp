@@ -358,28 +358,27 @@ workitems_por_workgroups -> Número de work items que se lanzarán en cada work gr
 void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno, int num_workitems, int workitems_por_workgroups) {
 
 	cl_int error;
-	size_t Wi = num_workitems , Wi_g = num_workitems/num_sb;
-	cl_double *matEnt = new cl_double[N*N];
+	
 	//cl_double *matSal = new cl_double[N*N];
 	int tBuff = 0;
+	int maxWI = 0;
 	for(int i = 0 ;  i < num_sb ; i++){
 		tBuff += ternas[i].t * ternas[i].t;
+		if(maxWI  >= ternas[i].t)
+			maxWI = ternas[i].t;
 	}
+	
+	size_t Wi = maxWI*num_sb , Wi_g = maxWI;
 	
 	cl_double *terEnt = new cl_double[tBuff];
 	cl_double *terSal = new cl_double[tBuff];
-	
-	for(int i = 0 ; i < N*N ; i++)
-		matEnt[i] = A[i];
-		
-			
 		
 	cl_mem bTernas, bInMatriz, bInTernas, bOutTernas;	
 	
 	bTernas = clCreateBuffer (entorno.contexto, CL_MEM_USE_HOST_PTR, num_sb*sizeof(terna_t), ternas, &error);
 	if (error != CL_SUCCESS) { CodigoError(error); return;}
 	
-	bInMatriz = clCreateBuffer (entorno.contexto, CL_MEM_USE_HOST_PTR, N*N*sizeof(cl_double), matEnt, &error);
+	bInMatriz = clCreateBuffer (entorno.contexto, CL_MEM_USE_HOST_PTR, N*N*sizeof(cl_double), A, &error);
 	if (error != CL_SUCCESS) { CodigoError(error); return;}
 
 	bInTernas = clCreateBuffer (entorno.contexto, CL_MEM_USE_HOST_PTR, tBuff*sizeof(cl_double), terEnt, &error);
