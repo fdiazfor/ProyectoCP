@@ -364,8 +364,10 @@ void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno, int 
 	int maxWI = 0;
 	for(int i = 0 ;  i < num_sb ; i++){
 		tBuff += ternas[i].t * ternas[i].t;
-		if(maxWI  <= ternas[i].t)
+		if(maxWI  <= ternas[i].t){
 			maxWI = ternas[i].t;
+			printf("_____%d_____\n", maxWI);
+		}
 	}
 	
 	size_t Wi = maxWI*num_sb , Wi_g = maxWI;
