@@ -385,9 +385,6 @@ void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno, int 
 	bInTernas = clCreateBuffer (entorno.contexto, CL_MEM_USE_HOST_PTR, tBuff*sizeof(cl_double), terEnt, &error);
 	if (error != CL_SUCCESS) { CodigoError(error); return;}
 	
-	//bOutMatriz = clCreateBuffer (entorno.contexto, CL_MEM_USE_HOST_PTR, N*N*sizeof(cl_double), matSal, &error);
-	//if (error != CL_SUCCESS) { CodigoError(error); return;}
-	
 	bOutTernas = clCreateBuffer (entorno.contexto, CL_MEM_USE_HOST_PTR, tBuff*sizeof(cl_double), terSal, &error);
 	if (error != CL_SUCCESS) { CodigoError(error); return;}
 	

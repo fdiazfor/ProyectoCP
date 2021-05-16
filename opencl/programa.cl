@@ -58,16 +58,4 @@ __kernel void suma(__global double *A, __global double *B, __global terna_t *ter
 			A[(y%N)*N + (x%N)] += B[(y - inY)*siz + (x - inX) + inPos];
 		}
 	}
-	
-	
-	if(id == 0){
-		printf("1___1\n");
-		for(int y = 0 ; y < N ; y++){
-			for(int x = 0 ; x < N ; x++)
-				printf("%lf ", A[y*siz + x]);
-			printf("\n");
-		}
-		
-	}
-	
 }
