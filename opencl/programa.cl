@@ -28,15 +28,6 @@ __kernel void matrices(__global double *inM, __global terna_t *ternas, __global 
 	}
 	
 	barrier(CLK_GLOBAL_MEM_FENCE);
-	/*
-	if(id == 0){
-		for(int y = 0 ; y < siz ; y++){
-			for(int x = 0 ; x < siz ; x++)
-				printf("%lf ", Bin[y*siz + x + posVec]);
-			printf("\n");
-		}
-		
-	}*/
 	
 	//Calcular cuadrado
 	double sum;		
@@ -61,16 +52,6 @@ __kernel void suma(__global double *A, __global double *B, __global terna_t *ter
 	int inX = ternas[idT].x;
 	int id = get_global_id(0);
 	int iter = siz/get_global_size(0);
-	
-	if(id == 0){
-		printf("_____\n");
-		for(int y = 0 ; y < siz ; y++){
-			for(int x = 0 ; x < siz ; x++)
-				printf("%lf ", B[y*siz + x + inPos]);
-			printf("\n");
-		}
-		
-	}
 	
 	for(int y = get_global_id(0)*iter + inY ; y < (iter*(id+1)) + inY ; y++){
 		for(int x = inX ; x < (siz + inX) ; x++){

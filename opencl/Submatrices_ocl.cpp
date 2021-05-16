@@ -364,14 +364,12 @@ void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno, int 
 	int maxWI = 0;
 	for(int i = 0 ;  i < num_sb ; i++){
 		tBuff += ternas[i].t * ternas[i].t;
-			printf("_____%d_____\n", ternas[i].t);
 		if(maxWI  <= ternas[i].t){
 			maxWI = ternas[i].t;
 		}
 	}
 	
 	size_t Wi = maxWI*num_sb , Wi_g = maxWI;
-	printf("WI %d \t wi*wg %d \n", Wi, Wi_g);
 	
 	cl_double *terEnt = new cl_double[tBuff];
 	cl_double *terSal = new cl_double[tBuff];
@@ -413,18 +411,7 @@ void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno, int 
 	
 	error = clFinish(entorno.cola);
 	
-	/*
-	for(int k = 0 ; k < num_sb ; k++){
-		for(int i = 0 ; i < ternas[k].t ; i++){
-			for(int j = 0 ; j < ternas[k].t ; j++)
-				printf("%lf ", terSal[i*ternas[k].t + j]);
-			printf("\n");
-		}
-	}
-	*/
-	
 	int posVec = 0;
-
 	for(int i = 0 ; i < num_sb ; i++){
 		if(i > 0)
 			posVec += ternas[i - 1].t * ternas[i - 1].t;
