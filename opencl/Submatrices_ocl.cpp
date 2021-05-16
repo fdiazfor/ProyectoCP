@@ -369,6 +369,7 @@ void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno, int 
 	}
 	
 	size_t Wi = maxWI*num_sb , Wi_g = maxWI;
+	printf("WI %d \t wi*wg %d \n", Wi, Wi_g);
 	
 	cl_double *terEnt = new cl_double[tBuff];
 	cl_double *terSal = new cl_double[tBuff];
