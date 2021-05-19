@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <CL/cl.h>
+#include <mpi.h>
 
 typedef struct {
 	int x,  // Coordenada x de la submatriz
@@ -185,7 +186,6 @@ cl_int CrearPrograma(cl_program &program, cl_context context, cl_uint num_device
 	return CL_SUCCESS;
 }
 
-
 void initializedouble(int t,double *a,double lv,double uv)
 {
   int i;
@@ -323,7 +323,7 @@ cl_int InicializarEntornoOCL(EntornoOCL_t *entorno) {
 }
 
 cl_int LiberarEntornoOCL(EntornoOCL_t *entorno) {
-
+	
 	cl_int error;
 
 	error = clReleaseContext(entorno->contexto);
@@ -355,16 +355,15 @@ num_sb -> Número de submatrices
 num_workitems -> Número de work items que se usarán para lanzar el kernel. Es opcional, se puede usar o no dentro de la función
 workitems_por_workgroups -> Número de work items que se lanzarán en cada work group. Es opcional, se puede usar o no dentro de la función
 */
-void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno) {
-
-	cl_int error;
+void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno, int myrank) {
+		cl_int error;
 	
 	//cl_double *matSal = new cl_double[N*N];
 	int tBuff = 0;
 	int maxWI = 0;
 	for(int i = 0 ;  i < num_sb ; i++){
 		tBuff += ternas[i].t * ternas[i].t;
-		if(maxWI  < ternas[i].t){
+		if(maxWI  <= ternas[i].t){
 			maxWI = ternas[i].t;
 		}
 	}
@@ -407,6 +406,12 @@ void ocl(int N,double *A,terna_t *ternas, int num_sb, EntornoOCL_t entorno) {
 	if (error != CL_SUCCESS) { CodigoError(error); return;}
 	
 	error = clFinish(entorno.cola);
+	
+	if(myrank != 0){
+		for(int i = 0 ; i < N*N; i++){
+			A[i] = 0;
+		}
+	}
 	
 	int posVec = 0;
 	for(int i = 0 ; i < num_sb ; i++){
@@ -457,60 +462,129 @@ int main(int argc,char *argv[]) {
 		num_problems, 		 	   // Número de experimentos
 		matrix_size, 		 	   // Tamaño de la matriz
 		seed, 			 	   // Semilla  
-		num_random;		 	   // Número de submatrices
-	double *A; 			 	   // Matriz de datos. Se representa en forma de vector. Para acceder a la fila f y la columna c: A[f*N+c]
-	terna_t *ternas;			   // Vector de ternas con los tamaños y las coordenadas de las submatrices
+		num_random, 		 	   // Número de submatrices
+		myrank,				   // Identificador del proceso
+		size;				   // Número de procesos lanzados
+	double *A; 			 	   // Matriz de datos. Se representa en forma de vector. Para acceder a la fila f y la columna c: A[f*N+c]	terna_t *ternas;			   // Vector de ternas con los tamaños y las coordenadas de las submatrices
+	double *subA;
 	long long ti,			 	   // Tiempo inicial
 			tf,			 	   // Tiempo final
 			tt=0; 		 	   // Tiempo acumulado de los tiempos parciales de todos los experimentos realizados
 	FILE *f;				 	   // Fichero con los datos de entrada
 	EntornoOCL_t entorno; 	 	   //Entorno para el control de OpenCL
+	terna_t *ternas;
+	terna_t *subt;
 
 	if (!ObtenerParametros(argc, argv, &debug, &num_workitems, &workitems_por_workgroups)) {
 		printf("Ejecución incorrecta\nEl formato correcto es %s fichEntrada [-d] [-wi work_items] [-wi_wg workitems_por_workgroup]\n", argv[0]);
 		return 0;
 	}
+
+	MPI_Init(&argc,&argv);
+  	MPI_Comm_rank(MPI_COMM_WORLD,&myrank);
+  	MPI_Comm_size(MPI_COMM_WORLD,&size);
 	
 	InicializarEntornoOCL(&entorno);
 
 	// Se leen el número de experimentos a realizar
-	f=fopen(argv[1],"r");
-	fscanf(f, "%d",&num_problems);
+	if(myrank==0) { // Sólo el proceso 0 tiene acceso al fichero y, por tanto, a los datos
+		f=fopen(argv[1],"r");
+		fscanf(f, "%d",&num_problems);
+	}
 	
+	ti=mseconds(); 
+// **************************************************************************
+// ***************************** IMPLEMENTACIÓN *****************************
+// **************************************************************************
+
+	// Se debe enviar el número de experimentos a todos los procesos
+	MPI_Bcast(&num_problems, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	
+// **************************************************************************
+// *************************** FIN IMPLEMENTACIÓN ***************************
+// **************************************************************************
+	tf=mseconds(); 
+	tt+=tf-ti;
+
 	for(i=0;i<num_problems;i++) {
-		//Por cada experimento se leen
-		fscanf(f, "%d",&matrix_size);	//Tamaño de la matriz (cuadrada)
-		fscanf(f, "%d",&seed);		//Semilla para la inicialización de números aleatorios
-		fscanf(f, "%d",&num_random);	//Número de submatrices a generar
-		//Reserva de memoria para la matriz de datos y las ternas de las submatrices
-		A = (double *) malloc(sizeof(double)*matrix_size*matrix_size);
-		ternas = (terna_t *) malloc(sizeof(terna_t)*num_random);
-		
-		srand(seed);
-		initialize(matrix_size,A,ternas,num_random);
-		
-		if (debug) {
-			printf("Matriz original del experimento %d:\n", i); escribir(matrix_size, A);
-			printf("Submatrices del experimento %d:\n", i); escribirt(ternas, num_random);
+		if(myrank==0) { // Sólo el proceso 0 tiene acceso al fichero y, por tanto, a los datos
+			//Por cada experimento se leen
+			fscanf(f, "%d",&matrix_size);	//Tamaño de la matriz (cuadrada)
+			fscanf(f, "%d",&seed);		//Semilla para la inicialización de números aleatorios
+			fscanf(f, "%d",&num_random);	//Número de submatrices a generar
+			//Reserva de memoria para la matriz de datos y las ternas de las submatrices
+			A = (double *) malloc(sizeof(double)*matrix_size*matrix_size);
+			subA = (double *) malloc(sizeof(double)*matrix_size*matrix_size);
+			ternas = (terna_t *) malloc(sizeof(terna_t)*num_random);
+
+			srand(seed);
+			initialize(matrix_size,A,ternas,num_random);
 			
-			printf("Numero de ternas %d \n", num_random);
+			if (debug) {
+				printf("Matriz original del experimento %d:\n", i); escribir(matrix_size, A);
+				printf("Submatrices del experimento %d:\n", i); escribirt(ternas, num_random);
+			}
 		}
 
 		ti=mseconds(); 
-		ocl(matrix_size, A, ternas, num_random, entorno);
+// **************************************************************************
+// ***************************** IMPLEMENTACIÓN *****************************
+// **************************************************************************
+
+		// Deberán crearse las estructuras que se consideren necesarias para almacenar las partes de la información de cada proceso
+		// El proceso 0 debe repartir la información a procesar entre todos los procesos (incluido él mismo)
+		
+		MPI_Bcast(&matrix_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		
+		if(myrank != 0){
+			A = (double *) malloc(sizeof(double)*matrix_size*matrix_size);
+			subA = (double *) malloc(sizeof(double)*matrix_size*matrix_size);
+		}
+		
+		MPI_Bcast(A, matrix_size*matrix_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		
+		int tProc = num_random/size;
+		
+		subt = (terna_t *) malloc(sizeof(terna_t)*tProc);
+		
+		MPI_Scatter(ternas, tProc*3, MPI_INT, subt,tProc*3 , MPI_INT, 0, MPI_COMM_WORLD);
+		
+		ocl(matrix_size, A, subt, tProc, entorno, myrank);
+
+		// El proceso 0 debe recolectar la información procesada por todos los procesos (incluida la suya)
+		// Deberán liberarse todas las estructuras creadas para almacenar las partes de la información de cada proceso
+		
+		MPI_Reduce(A, subA, matrix_size*matrix_size, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		
+		for(int j = 0 ; j < matrix_size*matrix_size ; j++){
+			A[j] = subA[j];
+		}
+		//A = subA;
+
+		free(subt);
+		free(subA);
+// **************************************************************************
+// *************************** FIN IMPLEMENTACIÓN ***************************
+// **************************************************************************
 		tf=mseconds(); 
 		tt+=tf-ti;
 		
-		if (debug) {
-			printf("Tiempo del experimento %d: %Ld ms\n", i, tf-ti);
-			printf("Matriz resultado del experimento %d:\n", i); escribir(matrix_size, A);
+		if (myrank==0){
+			if (debug) {
+				printf("Tiempo del experimento %d: %Ld ms\n", i, tf-ti);
+				printf("Matriz resultado del experimento %d:\n", i); escribir(matrix_size, A);
+			}
+			free(A);
+			free(ternas);
 		}
-		free(A);
-		free(ternas);
 	}
   
 	LiberarEntornoOCL(&entorno);
-	printf("Tiempo total de %d experimentos: %Ld ms\n", num_problems, tt);
-	fclose(f);
+	MPI_Finalize();
+	if (myrank==0){
+		printf("Tiempo total de %d experimentos: %Ld ms\n", num_problems, tt);
+		fclose(f);
+	}
+
 	return 0;
 }
