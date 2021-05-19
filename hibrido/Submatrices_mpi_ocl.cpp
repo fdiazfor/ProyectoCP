@@ -536,6 +536,8 @@ int main(int argc,char *argv[]) {
 		
 		MPI_Bcast(&matrix_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 		
+		MPI_Bcast(&num_random, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		
 		if(myrank != 0){
 			A = (double *) malloc(sizeof(double)*matrix_size*matrix_size);
 			subA = (double *) malloc(sizeof(double)*matrix_size*matrix_size);
